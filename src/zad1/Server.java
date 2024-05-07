@@ -83,7 +83,6 @@ public class Server {
 
     public void stopServer() throws IOException {
         isServerRunning = false;
-        selector.close();
         ssc.close();
     }
 
