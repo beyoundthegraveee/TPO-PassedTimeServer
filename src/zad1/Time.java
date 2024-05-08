@@ -25,9 +25,9 @@ public class Time {
                 response += "Od "+
                         dateFormatter.format(start) + " do "
                         + dateFormatter.format(end) + "\n";
-                response += "- mija: " + daysBetween+" " +(daysBetween!=1? "dni":"dzień") + ", " +
+                response += " - mija: " + daysBetween+" " +(daysBetween!=1? "dni":"dzień") + ", " +
                         "tygodni " + Math.round(daysBetween / 7.0 *100)/100.0 + "\n";
-                response += "- kalendarzowo: " + getDateCalendar(start,end);
+                response += " - kalendarzowo: " + getDateCalendar(start,end);
 
             } else {
                 LocalDateTime start = LocalDateTime.parse(from);
@@ -40,10 +40,10 @@ public class Time {
                 response += "Od "+
                         dateTimeFormatter.format(start) + " do "
                         + dateTimeFormatter.format(end) + "\n";
-                response += "- mija: " + daysBetween+" " +(daysBetween!=1? "dni":"dzień") + ", " +
+                response += " - mija: " + daysBetween+" " +(daysBetween!=1? "dni":"dzień") + ", " +
                         "tygodni " + Math.round(daysBetween / 7.0 *100)/100.0 + "\n";
-                response +="- godzin: " + hours + ", " + "minut: " + minutes + "\n";
-                response += "- kalendarzowo: " + getDateCalendar(start.toLocalDate(),end.toLocalDate());
+                response +=" - godzin: " + hours + ", " + "minut: " + minutes + "\n";
+                response += " - kalendarzowo: " + getDateCalendar(start.toLocalDate(),end.toLocalDate());
             }
         }catch(Exception e){
             return "***"+e;
@@ -74,7 +74,7 @@ public class Time {
             }
         }
         if(days!=0){
-            response+=days + " " +(days>1? "dni" : "dzień") + " ";
+            response+=days + " " +(days>1? "dni" : "dzień");
         }
         return response;
     }

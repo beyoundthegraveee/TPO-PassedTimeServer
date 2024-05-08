@@ -25,7 +25,8 @@ public class Server {
 
     private ServerSocketChannel ssc = null;
 
-    private volatile boolean isServerRunning = true;
+    private Thread serverThread;
+
 
     private volatile Map<SocketChannel, String> clientLogs;
 
@@ -51,8 +52,8 @@ public class Server {
     }
 
     public void startServer(){
-        new Thread(()-> {
-            while (isServerRunning) {
+        serverThread = new Thread(() -> {
+            while (!serverThread.isInterrupted()) {
                 try {
                     selector.select();
                     Set<SelectionKey> keys = selector.selectedKeys();
@@ -63,7 +64,7 @@ public class Server {
                         if (key.isAcceptable()) {
                             SocketChannel socketChannel = ssc.accept();
                             socketChannel.configureBlocking(false);
-                            socketChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+                            socketChannel.register(selector, SelectionKey.OP_READ);
                             clientLogs.put(socketChannel, "");
                             continue;
                         }
@@ -76,14 +77,14 @@ public class Server {
                     e.printStackTrace();
                 }
             }
-        }).start();
+        });
+        serverThread.start();
 
     }
 
 
-    public void stopServer() throws IOException {
-        isServerRunning = false;
-        ssc.close();
+    public void stopServer(){
+        serverThread.interrupt();
     }
 
     public String getServerLog() {
