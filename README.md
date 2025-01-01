@@ -1,273 +1,96 @@
-Zadanie
-PASSTIME_SERVER
+PASSTIME_SERVER task
 
-Serwer (klasa Server) podaje informacje o mijającym czasie. Klienci (klasa Client) :
-a) łączą się z serwerem
-b) wysyłają żądania
+The server (Server class) provides information about the passing time. Clients (Client class): a) connect to the server b) send requests
 
-Dla każdego klienta serwer prowadzi log jego zapytań i ich wyników oraz ogólny log wszystkich żądań wszystkich klientów. Logi są realizowane w pamięci wewnętrznej serwera (poza systemem plikowym).
+For each client, the server keeps a log of its queries and their results, as well as a general log of all requests from all clients. Logs are executed in the server's internal memory (outside the file system).
 
-Protokół
+Protocol
 
-Żądanie	Odpowiedź	Przykład
-login id	logged in	login Adam
-dataOd dataDo	opis upływu czasu wg secyfikacji z S_PASSTIME	2019-01-20 2020-04-01          
-bye	logged out	
-bye and log transfer	zawartośc logu klienta	w przykładowym wydruku z działania klasy Main
+Request Response Example login id logged in login Adam dataFrom dataTo description of time elapsed according to specification from S_PASSTIME 2019-01-20 2020-04-01
+bye logged out bye and log transfer client log content in sample printout from Main class operation
 
+Server class structure
 
-Budowa klasy Server
+construct: : public Server(String host, int port)
 
-konstrukto: :
-public Server(String host, int port)
+Required methods: method: public void startServer() - starts the server in a separate thread, method: public void stopServer() - stops the server and the thread in which it is running method: String getServerLog() - returns a general server log Construction requirements for the Server class multiplexing socket channels (use of selector). the server can handle many clients in parallel, but the client requests are handled in a single thread Client class structure
 
-Wymagane metody:
- metoda: public void startServer() - uruchamia server w odrębnym wątku,
- metoda:  public void stopServer()  - zatrzymuje działanie serwera i wątku w którym działa
- metoda: String getServerLog() - zwraca ogólny log serwera
-Wymagania konstrukcyjne dla klasy Server
-multipleksowania kanałów gniazd (użycie selektora).
-serwer może obsługiwać równolegle wielu klientów, ale obsługa żądań klientów odbywa się w jednym wątku
-Budowa klasy Client
+constructor: public Client(String host, int port, String id), where id - client identifier
 
-konstruktor:
-public Client(String host, int port, String id), gdzie id - identyfikator klienta
+Required methods: method: public void connect() - connects to the server method: public String send(String req) - sends a request req and returns the server's response Design requirements for the Client class non-blocking input - output
 
-Wymagane metody:
-metoda: public void connect() - łączy z serwerem
-metoda: public String send(String req) - wysyła żądanie req i zwraca odpowiedź serwera
-Wymagania konstrukcyjne dla klasy Client
-nieblokujące wejście - wyjście
+Additionally, create a ClientTask class that allows clients to be launched in separate threads via ExecutorService. Objects of this class are created by the static method:
 
-Dodatkowo stworzyć klasę ClientTask, umożliwiającą uruchamianie klientów w odrębnych wątkach poprzez ExecutorService.
-Obiekty tej klasy tworzy statyczna metoda:
+public static ClientTask create(Client c, List<String> reqs, boolean showSendRes)
+where: c - client (Client class object) reqs - list of queries about the passage of time
 
-     public static ClientTask create(Client c, List<String> reqs, boolean showSendRes)
+The code running in the thread should perform the following actions: connects to the server, sends a "login" request with the client identifier sends subsequent requests from the reqs list sends "bye and log transfer" and receives a log of queries and their results for a given client from the server. If the showSendRes parameter is true, after each send the server's response is printed to the console. Regardless of the parameter value, it should be ensured that the client log is available as soon as the client finishes working.
 
-gdzie:
-c - klient (obiekt klasy Client)
-reqs - lista zapytań o uplyw czasu
+Additionally, provide the Time classes (time calculation logic) and Tools (loading client options and requests needed for the Main class to work).
 
-Kod działający w wątku ma wykonywać następując działania:
-łączy się z serwerem,
-wysyła żądanie "login" z identyfikatorem klienta
-wysyła kolejne żądania z listy reqs
-wysyła "bye and log transfer" i odbiera od serwera log zapytań i ich wyników dla danego klienta
-Jeżeki parametr showSendRes jest true to po każdym send odpowiedź serwera jest wypisywana na konsoli. Niezależnie od wartości parametru należy zapewnić, by log klienta był dostępny jak tylko klient zakończy działanie.
-
-Dodatkowo dostarczyć klasy Time (logika obliczania czasu) oraz Tools (wczytywanie opcji i żadań klientów, potrzebnych do dzialania klasy Main).
-
-Przygotowana klasa Main ilustruje przypadki interakcji klient-serwer:
+The prepared Main class illustrates cases of client-server interaction:
 
 package zad1;
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.; import java.util.concurrent.;
 
 public class Main {
 
-  public static void main(String[] args) throws Exception {
-    String fileName = System.getProperty("user.home") + "/PassTimeServerOptions.yaml";
-    Options opts = Tools.createOptionsFromYaml(fileName);
-    String host = opts.getHost();
-    int port = opts.getPort();
-    boolean concur =  opts.isConcurMode();
-    boolean showRes = opts.isShowSendRes();
-    Map<String, List<String>> clRequests = opts.getClientsMap();
-    ExecutorService es = Executors.newCachedThreadPool();
-    List<ClientTask> ctasks = new ArrayList<>();
-    List<String> clogs = new ArrayList<>();
-   
-    Server s = new Server(host, port);
-    s.startServer();
-   
-    // start clients
-    clRequests.forEach( (id, reqList) -> {
-      Client c = new Client(host, port, id);
-      if (concur) {
-        ClientTask ctask = ClientTask.create(c, reqList, showRes);
-        ctasks.add(ctask);
-        es.execute(ctask);
-      } else {
-        c.connect();
-        c.send("login " + id);
-        for(String req : reqList) {
-          String res = c.send(req);
-          if (showRes) System.out.println(res);
-        }
-        String clog = c.send("bye and log transfer");
-        System.out.println(clog);
-      }
-    });
-   
-    if (concur) {
-      ctasks.forEach( task -> {
-        try {
-          String log = task.get();
-          clogs.add(log);
-        } catch (InterruptedException | ExecutionException exc) {
-          System.out.println(exc);
-        }
-      });
-      clogs.forEach( System.out::println);
-      es.shutdown();
-    }
-    s.stopServer();
-    System.out.println("\n=== Server log ===");
-    System.out.println(s.getServerLog());
-  }
+public static void main(String[] args) throws Exception { String fileName = System.getProperty("user.home") + "/PassTimeServerOptions.yaml"; Options opts = Tools.createOptionsFromYaml(fileName); String host = opts.getHost(); int port = opts.getPort(); boolean concur = opts.isConcurMode(); boolean showRes = opts.isShowSendRes(); Map<String, List> clRequests = opts.getClientsMap(); ExecutorService es = Executors.newCachedThreadPool(); List ctasks = new ArrayList<>(); List clogs = new ArrayList<>();
+
+Server s = new Server(host, port);
+s.startServer();
+
+// start clients
+clRequests.forEach( (id, reqList) -> {
+ Client c = new Client(host, port, id);
+ if (concur) {
+ ClientTask ctask = ClientTask.create(c, reqList, showRes);
+ ctasks.add(ctask);
+ es.execute(ctask);
+ } else {
+ c.connect();
+ c.send("login" + id);
+ for(String req : reqList) {
+ String res = c.send(req);
+ if (showRes) System.out.println(res);
+ }
+ String clog = c.send("bye and log transfer");
+ System.out.println(clog);
+ }
+});
+
+if (concur) {
+ctasks.forEach( task -> {
+try {
+String log = task.get();
+clogs.add(log);
+} catch (InterruptedException | ExecutionException exc) {
+System.out.println(exc);
+}
+});
+clogs.forEach( System.out::println);
+es.shutdown();
+}
+s.stopServer();
+System.out.println("\n=== Server log ===");
+System.out.println(s.getServerLog());
+}
 
 }
 
-Wyniki na konsoli
-A. Zawartośc pliku PassTimeServerOptions.yaml
+Console results A. Contents of PassTimeServerOptions.yaml file
 
-host: localhost
-port: 7777
-concurMode: false   # czy klienci działają równolegle?
-showSendRes: false  # czy pokazywać zwrócone przez serwer wyniki metody send(...)
-clientsMap: # id_klienta -> lista żądań
-  Asia:
-    - 2019-01-10 2020-03-01
-    - 2020-03-27T10:00 2020-03-28T10:00
-  Adam:
-    - 2018-01-01 2020-03-27
-    - 2020-03-28T10:00 2020-03-29T10:00
+host: localhost port: 7777 concurMode: false # are clients running in parallel? showSendRes: false # whether to show the results of the send(...) method returned by the server clientsMap: # client_id -> list of requests Asia: - 2019-01-10 2020-03-01 - 2020-03-27T10:00 2020-03-28T10:00 Adam: - 2018-01-01 2020-03-27 - 2020-03-28T10:00 2020-03-29T10:00
 
-A. Wynik:
-=== Asia log start ===
-logged in
-Request: 2019-01-10 2020-03-01
-Result:
-Od 10 stycznia 2019 (czwartek) do 1 marca 2020 (niedziela)
- - mija: 416 dni, tygodni 59.43
- - kalendarzowo: 1 rok, 1 miesiąc, 20 dni
-Request: 2020-03-27T10:00 2020-03-28T10:00
-Result:
-Od 27 marca 2020 (piątek) godz. 10:00 do 28 marca 2020 (sobota) godz. 10:00
- - mija: 1 dzień, tygodni 0.14
- - godzin: 24, minut: 1440
- - kalendarzowo: 1 dzień
-logged out
-=== Asia log end ===
+A. Result: === Asia log start === logged in Request: 2019-01-10 2020-03-01 Result: From January 10, 2019 (Thursday) to March 1, 2020 (Sunday)
 
-=== Adam log start ===
-logged in
-Request: 2018-01-01 2020-03-27
-Result:
-Od 1 stycznia 2018 (poniedziałek) do 27 marca 2020 (piątek)
- - mija: 816 dni, tygodni 116.57
- - kalendarzowo: 2 lata, 2 miesiące, 26 dni
-Request: 2020-03-28T10:00 2020-03-29T10:00
-Result:
-Od 28 marca 2020 (sobota) godz. 10:00 do 29 marca 2020 (niedziela) godz. 10:00
- - mija: 1 dzień, tygodni 0.14
- - godzin: 23, minut: 1380
- - kalendarzowo: 1 dzień
-logged out
-=== Adam log end ===
+passes: 416 days, weeks 59.43
+calendar: 1 year, 1 month, 20 days Request: 2020-03-27T10:00 2020-03-28T10:00 Result: From March 27, 2020 (Friday) 10:00 AM to March 28, 2020 (Saturday) 10:00 AM 10:00
+passes: 1 day, weeks 0.14
+hours: 24, minutes: 1440
+calendar: 1 day logged out === Asia log end ===
+=== Adam log start === logged in Request: 2018-01-01 2020-03-27 Result: From January 1, 2018 (Monday) to March 27, 2020 (Friday)
 
-
-=== Server log ===
-Asia logged in at 16:54:09.507
-Asia request at 16:54:09.554: "2019-01-10 2020-03-01"
-Asia request at 16:54:10.193: "2020-03-27T10:00 2020-03-28T10:00"
-Asia logged out at 16:54:10.256
-Adam logged in at 16:54:10.318
-Adam request at 16:54:10.382: "2018-01-01 2020-03-27"
-Adam request at 16:54:10.444: "2020-03-28T10:00 2020-03-29T10:00"
-Adam logged out at 16:54:10.506
-
-
-B, W pliku PassTimeServerOptions.yaml ustawiono:
-concurMode: true   # czy klienci działają równolegle?
-showSendRes: false  # czy pokazywać zwrócone przez serwer wyniki metody send(...)
-
-B. Wynik - zmienia się log serwera:
-=== Server log ===
-Asia logged in at 16:59:23.494
-Adam logged in at 16:59:23.494
-Asia request at 16:59:23.541: "2019-01-10 2020-03-01"
-Adam request at 16:59:24.071: "2018-01-01 2020-03-27"
-Asia request at 16:59:24.102: "2020-03-27T10:00 2020-03-28T10:00"
-Adam request at 16:59:24.118: "2020-03-28T10:00 2020-03-29T10:00"
-Asia logged out at 16:59:24.165
-Adam logged out at 16:59:24.165
-
-
-C, W pliku PassTimeServerOptions.yaml ustawiono:
-concurMode: false  # czy klienci działają równolegle?
-showSendRes: true  # czy pokazywać zwrócone przez serwer wyniki metody send(...)
-
-C. Wyniki:
-Od 10 stycznia 2019 (czwartek) do 1 marca 2020 (niedziela)
- - mija: 416 dni, tygodni 59.43
- - kalendarzowo: 1 rok, 1 miesiąc, 20 dni
-Od 27 marca 2020 (piątek) godz. 10:00 do 28 marca 2020 (sobota) godz. 10:00
- - mija: 1 dzień, tygodni 0.14
- - godzin: 24, minut: 1440
- - kalendarzowo: 1 dzień
-=== Asia log start ===
-logged in
-Request: 2019-01-10 2020-03-01
-Result:
-Od 10 stycznia 2019 (czwartek) do 1 marca 2020 (niedziela)
- - mija: 416 dni, tygodni 59.43
- - kalendarzowo: 1 rok, 1 miesiąc, 20 dni
-Request: 2020-03-27T10:00 2020-03-28T10:00
-Result:
-Od 27 marca 2020 (piątek) godz. 10:00 do 28 marca 2020 (sobota) godz. 10:00
- - mija: 1 dzień, tygodni 0.14
- - godzin: 24, minut: 1440
- - kalendarzowo: 1 dzień
-logged out
-=== Asia log end ===
-
-Od 1 stycznia 2018 (poniedziałek) do 27 marca 2020 (piątek)
- - mija: 816 dni, tygodni 116.57
- - kalendarzowo: 2 lata, 2 miesiące, 26 dni
-Od 28 marca 2020 (sobota) godz. 10:00 do 29 marca 2020 (niedziela) godz. 10:00
- - mija: 1 dzień, tygodni 0.14
- - godzin: 23, minut: 1380
- - kalendarzowo: 1 dzień
-=== Adam log start ===
-logged in
-Request: 2018-01-01 2020-03-27
-Result:
-Od 1 stycznia 2018 (poniedziałek) do 27 marca 2020 (piątek)
- - mija: 816 dni, tygodni 116.57
- - kalendarzowo: 2 lata, 2 miesiące, 26 dni
-Request: 2020-03-28T10:00 2020-03-29T10:00
-Result:
-Od 28 marca 2020 (sobota) godz. 10:00 do 29 marca 2020 (niedziela) godz. 10:00
- - mija: 1 dzień, tygodni 0.14
- - godzin: 23, minut: 1380
- - kalendarzowo: 1 dzień
-logged out
-=== Adam log end ===
-
-
-=== Server log ===
-Asia logged in at 17:02:34.537
-Asia request at 17:02:34.583: "2019-01-10 2020-03-01"
-Asia request at 17:02:35.145: "2020-03-27T10:00 2020-03-28T10:00"
-Asia logged out at 17:02:35.207
-Adam logged in at 17:02:35.207
-Adam request at 17:02:35.207: "2018-01-01 2020-03-27"
-Adam request at 17:02:35.270: "2020-03-28T10:00 2020-03-29T10:00"
-Adam logged out at 17:02:35.335
-
-
-Podsumowanie - klasy w projekcie i co należy zrobić.
-
-Klasa	Uwagi
-Main	jest w projekcie - niemodyfikowalna
-Options	jest w projekcie - niemodyfikowalna
-Time	do zrobienia wg specyfikacji S_PASSTIME   ew. już gotowa z zad. 3  
-Tools	do zrobienia wg specyfikacji S_PASSTIME   ew. już gotowa z zad. 3  
-Server	do zrobienia
-Client	do zrobienia
-ClientTask	do zrobienia
-
-
-Uwaga: dobrą praktyką byłoby rozdzielenie klas na różne pakiety (server, client, tools itp.), ale NIE ROBIMY TEGO,  by  nie zwiększac już i tak trochę skomplikowanej struktury zadania. Wszystkie klasy są więc w pakiecie zad1.
+passes: 816 days, weeks 116.57
+calendar: 2 years, 2 months
